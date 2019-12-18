@@ -23,10 +23,6 @@ def do_coauthor_graph(data, author_id, level):
     pass
 
 
-def do_coauthor_graph(data, author_id, level):
-    pass
-
-
 def do_author_network(data):
     pass
 
