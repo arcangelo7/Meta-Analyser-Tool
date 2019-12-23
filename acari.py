@@ -63,6 +63,3 @@ def do_author_network(data):
 def do_retrieve_tree_of_venues(data, no_ids):
     return None
 
-
-data = process_metadata("metadata_sample.csv")
-print(do_get_by_id(data, "orcid:0000-0003-0387-921X"))
