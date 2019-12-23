@@ -33,8 +33,19 @@ def do_get_ids(data, str_value, field_set):
     return None
 
 
-def do_get_by_id(data, id, field_set):
-    return None
+def do_get_by_id(data, id, field_set=None):
+    items = set()
+    for line in data:
+        if field_set is not None:
+            for field in field_set:
+                if id in line[field]:
+                    items.add(line[field])
+        else:
+            for key, value in line.items():
+                if id in value:
+                    items.add(value)
+    return items
+
 
 
 def do_filter(data, field_value_list):
@@ -54,5 +65,4 @@ def do_retrieve_tree_of_venues(data, no_ids):
 
 
 data = process_metadata("metadata_sample.csv")
-for line in data:
-    print(line)
+print(do_get_by_id(data, "orcid:0000-0003-0387-921X"))
