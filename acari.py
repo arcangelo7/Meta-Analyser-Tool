@@ -20,8 +20,13 @@
 # https://comp-think.github.io/2019-2020/slides/14%20-%20Project.html
 
 
+import csv
+
+
 def process_metadata(file_path):
-    return None
+    with open(file_path, 'r', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        return list(reader) # It returns a list of ordered dictionaries. It means that it keeps the order of the keys since Python 3.7
 
 
 def do_get_ids(data, str_value, field_set):
@@ -46,3 +51,8 @@ def do_author_network(data):
 
 def do_retrieve_tree_of_venues(data, no_ids):
     return None
+
+
+data = process_metadata("metadata_sample.csv")
+for line in data:
+    print(line)
