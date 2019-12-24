@@ -20,3 +20,18 @@ from mat import MetaAnalyserTool
 my_mat = MetaAnalyserTool("metadata_sample.csv")
 
 # my_mat.<method> ...
+
+
+# A function to measure the time of other functions
+import time
+
+
+def measure_runtime(func):
+    start = time.time()
+    func()
+    end = time.time()
+    print(end - start)
+
+
+# Example of use
+measure_runtime(lambda: my_mat.get_by_id("orcid:0000-0003-0387-921X", None))
