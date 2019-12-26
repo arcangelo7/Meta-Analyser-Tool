@@ -21,6 +21,7 @@
 
 
 import csv
+from anytree import Node, search
 
 
 def process_metadata(file_path):
@@ -33,7 +34,7 @@ def do_get_ids(data, str_value, field_set):
     return None
 
 
-def do_get_by_id(data, id, field_set=None):
+def do_get_by_id(data, id, field_set):
     items = set()
     for line in data:
         if field_set is not None:
@@ -60,6 +61,35 @@ def do_author_network(data):
     return None
 
 
+def build_tree(root, line, venues_found):
+    global existing_volume
+    if line["venue"] not in venues_found and line["venue"] != "":
+        venues_found.add(line["venue"])
+        venue_node = Node(line["venue"], root)
+        if line["volume"] != "":
+            volume_node = Node(line["volume"], venue_node)
+        if line["issue"] != "":
+            Node(line["issue"], volume_node)
+    else:
+        venue_node = search.find(root, lambda node: node.name == line["venue"], maxlevel=2)
+        if venue_node is not None:
+            existing_volume = search.findall(venue_node, lambda node: node.name == line["volume"], maxlevel=3)
+        if not existing_volume and line["volume"] != "":
+            volume_node = Node(line["volume"], venue_node)
+            if line["issue"] != "":
+                Node(line["issue"], volume_node)
+
+
 def do_retrieve_tree_of_venues(data, no_ids):
-    return None
+    root = Node("venues")
+    venues_found = set()
+    for line in data:
+        if no_ids is None:
+            build_tree(root, line, venues_found)
+        else:
+            for id in no_ids:
+                if id not in line["venue"]:
+                    build_tree(root, line, venues_found)
+    return root
+
 
