@@ -88,7 +88,22 @@ def do_get_by_id(data, id, field_set):
 
 
 def do_filter(data, field_value_list):
-    return None
+    regex = re.sub(r'\\\*', r'.*?', re.escape(field_value_list[1]))
+    for line in data:
+        if field_value_list[0] != '':
+            match_lst = re.findall(r'\b' + regex + r'\b', line[field_value_list[0]], re.IGNORECASE)
+            if len(match_lst) != 0:
+                output_string = line['author'] + ' (' + line['pub_date'] + '). ' + line['title'] + '. ' + line['venue']
+                output_string = re.sub(r'\s\[.*?\]', r'', output_string)
+                print(output_string)
+        else:
+            for key in line.keys():
+                match_lst = re.findall(r'\b' + regex + r'\b', line[key], re.IGNORECASE)
+                if len(match_lst) != 0:
+                    output_string = line['author'] + ' (' + line['pub_date'] + '). ' + line['title'] + '. ' + line[
+                        'venue']
+                    output_string = re.sub(r'\s\[.*?\]', r'', output_string)
+                    print(output_string)
 
 
 def do_coauthor_graph(data, author_id, level):
