@@ -23,6 +23,10 @@
 import csv
 from anytree import Node, search
 import re
+import networkx as nx
+import matplotlib.pyplot as plt
+from collections import deque
+from itertools import product
 
 
 def process_metadata(file_path):
@@ -106,12 +110,51 @@ def do_filter(data, field_value_list):
                     print(output_string)
 
 
-def do_coauthor_graph(data, author_id, level):
-    return None
+def find_authors_recursively(data, string_to_search, dictionary, level):
+    if level == 0 or len(string_to_search) == 0:
+        return dictionary
+
+    coauthors = set()
+    for item in string_to_search:
+        if item not in dictionary:
+            is_an_id = True if ":" in item else False
+            author_name = item.split('[')[1].split(']')[0] if is_an_id else item
+            for line in data:
+                if author_name in line["author"]:
+                    author = line["author"].split(f"[{author_name}")[0].split(";")[-1].strip() if is_an_id else author_name
+                    no_ids = re.sub("\[.*?\]", "", line["author"])
+                    coauthors_names = {name.strip() for name in no_ids.split(";") if author not in name}
+                    coauthors.update(coauthors_names)
+            dictionary[author] = coauthors
+
+    string_to_search.extend(coauthors)
+    level -= 1
+    return find_authors_recursively(data, string_to_search, dictionary, level)
+    # Bug: it doesn't merge authors with the same id but different string
 
 
-def do_author_network(data):
-    return None
+def do_coauthor_graph(data, string_to_search, level):
+    authors_to_visit = deque()
+    authors_to_visit.append(string_to_search)
+    final_dict = find_authors_recursively(data, authors_to_visit, dict(), level)
+    coauthor_graph = nx.from_dict_of_lists(final_dict, create_using=nx.MultiGraph)
+    return coauthor_graph
+
+
+def do_author_network(mdata):
+    coauthgraph = nx.Graph()
+    for row in mdata:
+        if (row['author']):
+            auths = row['author'].split(';')
+            auths = [aut.strip() for aut in auths]
+            for aut1, aut2 in product(auths,auths):
+                if not coauthgraph.has_node(aut1):
+                    coauthgraph.add_node(aut1)
+                if not coauthgraph.has_node(aut2):
+                    coauthgraph.add_node(aut2)
+                if(aut1 != aut2) and not coauthgraph.has_edge(aut1, aut2):
+                    coauthgraph.add_edge(aut1,aut2)
+    return coauthgraph
 
 
 def build_tree(root, line, venues_found):
