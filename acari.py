@@ -118,10 +118,9 @@ def find_authors_recursively(data, string_to_search, dictionary, level):
     for item in string_to_search:
         if item not in dictionary:
             is_an_id = True if ":" in item else False
-            author_name = item.split('[')[1].split(']')[0] if is_an_id else item
             for line in data:
-                if author_name in line["author"]:
-                    author = line["author"].split(f"[{author_name}")[0].split(";")[-1].strip() if is_an_id else author_name
+                if item in line["author"]:
+                    author = line["author"].split(f"[{item}")[0].split(";")[-1].strip() if is_an_id else item
                     no_ids = re.sub("\[.*?\]", "", line["author"])
                     coauthors_names = {name.strip() for name in no_ids.split(";") if author not in name}
                     coauthors.update(coauthors_names)
