@@ -35,44 +35,27 @@ def process_metadata(file_path):
         return list(reader) # It returns a list of ordered dictionaries. It means that it keeps the order of the keys since Python 3.7
 
 
+def do_get_match (my_regex, my_dict, retrieve_keys):
+    output_lst = []
+    for key in retrieve_keys:
+        match_lst = re.findall(r'\b' + my_regex + r'\b(?:[^;]*?\[(.*?)\])?;?', my_dict.get(key), re.IGNORECASE)
+        if len(match_lst) > 0:
+            output_lst.extend(my_dict.get('id').split('; '))
+            for match in match_lst:
+                if match != '':
+                    output_lst.extend(match.split('; '))
+    return output_lst
+
 def do_get_ids(data, str_value, field_set=None):
     items = set()
-    regex = re.escape(str_value)
-    ##escape toglie eventuali caratteri speciali che hanno un significato per re
-    if '*' in str_value:
-        regex = re.sub(r'\\\*', r'.*?', regex)
-        ##ogni volta che c'è un asterisco nella stringa trasformalo in un quantificatore pigro
-        ##che segue il simbolo speciale \.
+    regex = re.sub(r'\\\*', r'.*?', re.escape(str_value))
     for line in data:
         if field_set is not None:
-            for field in field_set:
-                match_lst = re.findall(r'(\b' + regex + r'\b)(?:\s.*?\[(.*?)\])?', line[field],
-                                       re.IGNORECASE)
-                ##crea una lista di tuple (stringa, id1;1d2;etc.)
-                if len(match_lst) > 0:
-                    if field == 'title':
-                        items.add(line['id'])
-                        ##se quello matchato è il titolo
-                        ##aggiungi all'insieme line[id]
-                    else:
-                        for match in match_lst:
-                            if match[1] != '':
-                                items.add(match[1])
-                        ##se c'è un match, fornisci il secondo valore nella tupla
-                        ##se questo non è una stringa vuota(= nessun id1;id2;etc. trovato)
-
+           id_lst = do_get_match(regex, line, field_set)
         else:
-            ##fa la stessa cosa ma iterando su ogni coppia key-value dei dizionari nella lista
-            for key, value in line.items():
-                match_lst = re.findall(r'(\b' + regex + r'\b)(?:\s.*?\[(.*?)\])?', line[key],
-                                       re.IGNORECASE)
-                if len(match_lst) > 0:
-                    if key == 'title':
-                        items.add(line['id'])
-                    else:
-                        for match in match_lst:
-                            if match[1] != '':
-                                items.add(match[1])
+            retrieve_set = {'title', 'author', 'venue', 'publisher'}
+            id_lst = do_get_match(regex, line, retrieve_set)
+        items.update(id_lst)
     return items
 
 
