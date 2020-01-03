@@ -46,6 +46,7 @@ def do_get_match (my_regex, my_dict, retrieve_keys):
                     output_lst.extend(match.split('; '))
     return output_lst
 
+
 def do_get_ids(data, str_value, field_set=None):
     items = set()
     regex = re.sub(r'\\\*', r'.*?', re.escape(str_value))
@@ -71,7 +72,6 @@ def do_get_by_id(data, id, field_set):
                 if id in value:
                     items.add(value)
     return items
-
 
 
 def do_filter(data, field_value_list):
@@ -124,18 +124,16 @@ def do_coauthor_graph(data, string_to_search, level):
 
 
 def do_author_network(mdata):
-    coauthgraph = nx.Graph()
+    coauthgraph = nx.MultiGraph()
     for row in mdata:
-        if (row['author']):
-            auths = row['author'].split(';')
-            auths = [aut.strip() for aut in auths]
-            for aut1, aut2 in product(auths,auths):
-                if not coauthgraph.has_node(aut1):
-                    coauthgraph.add_node(aut1)
-                if not coauthgraph.has_node(aut2):
-                    coauthgraph.add_node(aut2)
-                if(aut1 != aut2) and not coauthgraph.has_edge(aut1, aut2):
-                    coauthgraph.add_edge(aut1,aut2)
+        auths = {aut.strip() for aut in row['author'].split(';')}
+        for aut1, aut2 in product(auths,auths):
+            if not coauthgraph.has_node(aut1):
+                coauthgraph.add_node(aut1)
+            if not coauthgraph.has_node(aut2):
+                coauthgraph.add_node(aut2)
+            if(aut1 != aut2) and not coauthgraph.has_edge(aut1, aut2):
+                coauthgraph.add_edge(aut1,aut2)
     return coauthgraph
 
 
