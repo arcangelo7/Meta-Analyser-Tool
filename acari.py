@@ -50,12 +50,10 @@ def do_get_match (my_regex, my_dict, retrieve_keys):
 def do_get_ids(data, str_value, field_set=None):
     items = set()
     regex = re.sub(r'\\\*', r'.*?', re.escape(str_value))
+    if field_set is None:
+        field_set = {'title', 'author', 'venue', 'publisher'}
     for line in data:
-        if field_set is not None:
-           id_lst = do_get_match(regex, line, field_set)
-        else:
-            retrieve_set = {'title', 'author', 'venue', 'publisher'}
-            id_lst = do_get_match(regex, line, retrieve_set)
+        id_lst = do_get_match(regex, line, field_set)
         items.update(id_lst)
     return items
 
@@ -74,23 +72,26 @@ def do_get_by_id(data, id, field_set):
     return items
 
 
+def do_get_str(my_regex, my_dict, retrieve_keys):
+    for key in retrieve_keys:
+        match_lst = re.findall(r'\b' + my_regex + r'\b', my_dict.get(key), re.IGNORECASE)
+        if len(match_lst) != 0:
+            output_string = my_dict['author'] + ' (' + my_dict['pub_date'] + '). ' + my_dict['title'] + '. ' + my_dict['venue']
+            output_string = re.sub(r'\s\[.*?\]', r'', output_string)
+            return output_string
+    return None
+
 def do_filter(data, field_value_list):
     regex = re.sub(r'\\\*', r'.*?', re.escape(field_value_list[1]))
+    items = []
+    if field_value_list[0] != '':
+        field_set = {field_value_list[0]}
+    else:
+        field_set = data[0].keys()
     for line in data:
-        if field_value_list[0] != '':
-            match_lst = re.findall(r'\b' + regex + r'\b', line[field_value_list[0]], re.IGNORECASE)
-            if len(match_lst) != 0:
-                output_string = line['author'] + ' (' + line['pub_date'] + '). ' + line['title'] + '. ' + line['venue']
-                output_string = re.sub(r'\s\[.*?\]', r'', output_string)
-                print(output_string)
-        else:
-            for key in line.keys():
-                match_lst = re.findall(r'\b' + regex + r'\b', line[key], re.IGNORECASE)
-                if len(match_lst) != 0:
-                    output_string = line['author'] + ' (' + line['pub_date'] + '). ' + line['title'] + '. ' + line[
-                        'venue']
-                    output_string = re.sub(r'\s\[.*?\]', r'', output_string)
-                    print(output_string)
+        txt_rep = do_get_str(regex, line, field_set)
+        items.append(txt_rep)
+    return items
 
 
 def find_authors_recursively(data, string_to_search, dictionary, level):
