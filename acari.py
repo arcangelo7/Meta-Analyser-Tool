@@ -36,22 +36,22 @@ def process_metadata(file_path):
 
 
 def do_get_match (my_regex, my_dict, retrieve_keys):
-    output_lst = []
+    output_lst = set()
     for key in retrieve_keys:
-        match_lst = re.findall(r'\b' + my_regex + r'\b(?:[^;]*?\[(.*?)\])?;?', my_dict.get(key), re.IGNORECASE)
+        match_lst = re.findall(r'\b' + my_regex + r'\b(?:[^;]*?\[(.*?)\])?;?', my_dict[key], re.IGNORECASE)
         if len(match_lst) > 0:
-            output_lst.extend(my_dict.get('id').split('; '))
+            output_lst.update(my_dict.get('id').split('; '))
             for match in match_lst:
                 if match != '':
-                    output_lst.extend(match.split('; '))
+                    output_lst.update(match.split('; '))
     return output_lst
 
 
-def do_get_ids(data, str_value, field_set=None):
+def do_get_ids(data, str_value, field_set):
     items = set()
     regex = re.sub(r'\\\*', r'.*?', re.escape(str_value))
     if field_set is None:
-        field_set = {'title', 'author', 'venue', 'publisher'}
+        field_set = data.keys()
     for line in data:
         id_lst = do_get_match(regex, line, field_set)
         items.update(id_lst)
@@ -81,6 +81,7 @@ def do_get_str(my_regex, my_dict, retrieve_keys):
             return output_string
     return None
 
+
 def do_filter(data, field_value_list):
     regex = re.sub(r'\\\*', r'.*?', re.escape(field_value_list[1]))
     items = []
@@ -94,32 +95,34 @@ def do_filter(data, field_value_list):
     return items
 
 
-def find_authors_recursively(data, string_to_search, dictionary, level):
-    if level == 0 or len(string_to_search) == 0:
+def find_authors_recursively(data, authors_to_visit, visited_authors, dictionary, level):
+    if level == 0 or len(authors_to_visit) == 0:
         return dictionary
 
-    coauthors = set()
-    for item in string_to_search:
-        if item not in dictionary:
-            is_an_id = True if ":" in item else False
+    for author_to_visit in authors_to_visit:
+        if author_to_visit not in visited_authors:
+            coauthors = set()
+            is_an_id = True if ":" in author_to_visit else False
             for line in data:
-                if item in line["author"]:
-                    author = line["author"].split(f"[{item}")[0].split(";")[-1].strip() if is_an_id else item
-                    no_ids = re.sub("\[.*?\]", "", line["author"])
-                    coauthors_names = {name.strip() for name in no_ids.split(";") if author not in name}
+                if author_to_visit in line["author"]:
+                    authors_and_ids = re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"])
+                    author = line["author"].split(f"[{author_to_visit}")[0].split(";")[-1].strip() if is_an_id else author_to_visit
+                    coauthors_names = {name.strip() for name, id in authors_and_ids if name.strip() != author}
                     coauthors.update(coauthors_names)
+            visited_authors.append(author)
             dictionary[author] = coauthors
 
-    string_to_search.extend(coauthors)
+    authors_to_visit.extend(coauthors)
     level -= 1
-    return find_authors_recursively(data, string_to_search, dictionary, level)
+    return find_authors_recursively(data, authors_to_visit, visited_authors, dictionary, level)
     # Bug: it doesn't merge authors with the same id but different string
 
 
 def do_coauthor_graph(data, string_to_search, level):
     authors_to_visit = deque()
+    visited_authors = deque()
     authors_to_visit.append(string_to_search)
-    final_dict = find_authors_recursively(data, authors_to_visit, dict(), level)
+    final_dict = find_authors_recursively(data, authors_to_visit, visited_authors, dict(), level)
     coauthor_graph = nx.from_dict_of_lists(final_dict, create_using=nx.MultiGraph)
     return coauthor_graph
 
