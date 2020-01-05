@@ -102,12 +102,12 @@ def find_authors_recursively(data, authors_to_visit, visited_authors, dictionary
     for author_to_visit in authors_to_visit:
         if author_to_visit not in visited_authors:
             coauthors = set()
-            is_an_id = True if ":" in author_to_visit else False
             for line in data:
                 if author_to_visit in line["author"]:
-                    authors_and_ids = re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"])
-                    author = line["author"].split(f"[{author_to_visit}")[0].split(";")[-1].strip() if is_an_id else author_to_visit
-                    coauthors_names = {name.strip() for name, id in authors_and_ids if name.strip() != author}
+                    authors_and_ids = [name[0].strip() for name in re.findall(r'([^;]+)(\[.*?\])?', line["author"])]
+                    is_an_id = re.findall('[^;]+' + re.escape(author_to_visit) + ']', line["author"])
+                    author = is_an_id[0].strip() if is_an_id else author_to_visit
+                    coauthors_names = {name.strip() for name in authors_and_ids if name != author}
                     coauthors.update(coauthors_names)
             visited_authors.append(author)
             dictionary[author] = coauthors
