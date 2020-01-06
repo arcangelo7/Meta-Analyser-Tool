@@ -96,23 +96,28 @@ def do_filter(data, field_value_list):
 
 
 def find_authors_recursively(data, authors_to_visit, visited_authors, dictionary, level):
-    if level == 0 or len(authors_to_visit) == 0:
+    if level == 0:
         return dictionary
 
-    for author_to_visit in authors_to_visit:
-        if author_to_visit not in visited_authors:
-            coauthors = set()
-            for line in data:
-                if author_to_visit in line["author"]:
-                    authors_and_ids = [name[0].strip() for name in re.findall(r'([^;]+)(\[.*?\])?', line["author"])]
-                    is_an_id = re.findall('[^;]+' + re.escape(author_to_visit) + ']', line["author"])
-                    author = is_an_id[0].strip() if is_an_id else author_to_visit
-                    coauthors_names = {name.strip() for name in authors_and_ids if name != author}
-                    coauthors.update(coauthors_names)
-            visited_authors.append(author)
-            dictionary[author] = coauthors
+    level_coauthors = set()
+    while len(authors_to_visit) > 0:
+        author_to_visit = authors_to_visit.popleft()
+        author_coauthors = set()
+        for line in data:
+            if author_to_visit.lower() in line["author"].lower():
+                authors_and_ids = [(name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"])]
+                is_an_id = re.findall('[^;]+' + re.escape(author_to_visit) + ']', line["author"])
+                author = is_an_id[0].strip() if is_an_id else author_to_visit
+                visited_authors.add(author)
+                coauthors_names = {name.strip() for name in authors_and_ids if name.lower() != author.lower()}
+                author_coauthors.update(coauthors_names)
+                level_coauthors.update(coauthors_names)
+        dictionary[author] = author_coauthors
 
-    authors_to_visit.extend(coauthors)
+    for coauthor in level_coauthors:
+        if coauthor not in visited_authors:
+            authors_to_visit.append(coauthor)
+
     level -= 1
     return find_authors_recursively(data, authors_to_visit, visited_authors, dictionary, level)
     # Bug: it doesn't merge authors with the same id but different string
@@ -120,10 +125,10 @@ def find_authors_recursively(data, authors_to_visit, visited_authors, dictionary
 
 def do_coauthor_graph(data, string_to_search, level):
     authors_to_visit = deque()
-    visited_authors = deque()
     authors_to_visit.append(string_to_search)
+    visited_authors = set()
     final_dict = find_authors_recursively(data, authors_to_visit, visited_authors, dict(), level)
-    coauthor_graph = nx.from_dict_of_lists(final_dict, create_using=nx.MultiGraph)
+    coauthor_graph = nx.from_dict_of_lists(final_dict, create_using=nx.Graph)
     return coauthor_graph
 
 
