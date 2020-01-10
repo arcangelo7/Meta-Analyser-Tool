@@ -72,27 +72,51 @@ def do_get_by_id(data, id, field_set):
     return items
 
 
-def do_get_str(my_regex, my_dict, retrieve_keys):
-    for key in retrieve_keys:
-        match_lst = re.findall(r'\b' + my_regex + r'\b', my_dict.get(key), re.IGNORECASE)
-        if len(match_lst) != 0:
-            output_string = my_dict['author'] + ' (' + my_dict['pub_date'] + '). ' + my_dict['title'] + '. ' + my_dict['venue']
-            output_string = re.sub(r'\s\[.*?\]', r'', output_string)
-            return output_string
-    return None
+def recursive_field_search(dict, queue, result=None):
+    if len(queue) > 0:
+        curr_tuple = queue.pop()
+        regex = re.sub(r'\\\*', r'.*?', re.escape(curr_tuple[1]))
+        field_to_search = curr_tuple[0]
+        if field_to_search not in dict.keys():
+            return result
+        elif field_to_search == 'id':
+            lst_of_strings = dict['id'].split(';')
+        elif field_to_search == 'authors':
+            lst_of_strings = re.findall(r'[^;\[]+)(?:\[.*?\])?;?)', dict['author'])
+        else:
+            lst_of_strings = [dict[field_to_search]]
+        for value in lst_of_strings:
+            result = re.match(r'' + regex + r'$', value.strip(), re.IGNORECASE)
+            if result is not None:
+                return recursive_field_search(dict, queue, result)
+    else:
+        return result
+
+
+def do_get_line_rep(dict):
+    authors_rep = []
+    authors_collection = re.findall(r'([^;\[]+)(?:\[.*?\])?;?', dict['author'])
+    for author in authors_collection:
+        family_n, given_n = author.split(',')
+        init_lst = re.findall(r'\b[A-Z]', given_n)
+        init_str = "".join(init_lst)
+        name_rep = family_n + " " + init_str
+        authors_rep.append(name_rep)
+    line_rep = ", ".join(authors_rep) + ' (' + dict['pub_date'] + '). ' + dict['title'] + '. ' + dict['venue']
+    line_rep = re.sub(r'\s\[.*?\]', r'', line_rep)
+    return line_rep
 
 
 def do_filter(data, field_value_list):
-    regex = re.sub(r'\\\*', r'.*?', re.escape(field_value_list[1]))
     items = []
-    if field_value_list[0] != '':
-        field_set = {field_value_list[0]}
-    else:
-        field_set = data[0].keys()
     for line in data:
-        txt_rep = do_get_str(regex, line, field_set)
-        items.append(txt_rep)
-    return items
+        if field_value_list is not None and len(field_value_list) > 0:
+            field_value_queue = deque(field_value_list)
+            match = recursive_field_search(line, field_value_queue)
+            if match is not None:
+                items.append(do_get_line_rep(line))
+        else:
+            items.append(do_get_line_rep(line))
 
 
 def find_authors_recursively(data, authors_to_visit, visited_authors, dictionary, level):
