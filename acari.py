@@ -35,25 +35,27 @@ def process_metadata(file_path):
         return list(reader) # It returns a list of ordered dictionaries. It means that it keeps the order of the keys since Python 3.7
 
 
-def do_get_match (my_regex, my_dict, retrieve_keys):
-    output_lst = set()
+def do_get_id_lst (my_regex, my_dict, retrieve_keys):
+    output_lst = []
     for key in retrieve_keys:
-        match_lst = re.findall(r'\b' + my_regex + r'\b(?:[^;]*?\[(.*?)\])?;?', my_dict[key], re.IGNORECASE)
-        if len(match_lst) > 0:
-            output_lst.update(my_dict.get('id').split('; '))
-            for match in match_lst:
-                if match != '':
-                    output_lst.update(match.split('; '))
+        if key in my_dict.keys():
+            strings_lst = re.findall(r'([^;\[]+)(?:\[(.*?)\])?;?', my_dict[key])
+            for string, ids in strings_lst:
+                matchobj = re.match(r'' + my_regex + r'$', string.strip(), re.IGNORECASE)
+                if matchobj:
+                    if len(output_lst) == 0:
+                        output_lst.extend(my_dict['id'].split('; '))
+                    if ids != '':
+                        output_lst.extend(ids.split('; '))
     return output_lst
-
 
 def do_get_ids(data, str_value, field_set):
     items = set()
     regex = re.sub(r'\\\*', r'.*?', re.escape(str_value))
     if field_set is None:
-        field_set = data.keys()
+        field_set = data[0].keys()
     for line in data:
-        id_lst = do_get_match(regex, line, field_set)
+        id_lst = do_get_id_lst(regex, line, field_set)
         items.update(id_lst)
     return items
 
@@ -82,7 +84,7 @@ def recursive_field_search(dict, queue, result=None):
         elif field_to_search == 'id':
             lst_of_strings = dict['id'].split(';')
         elif field_to_search == 'authors':
-            lst_of_strings = re.findall(r'[^;\[]+)(?:\[.*?\])?;?)', dict['author'])
+            lst_of_strings = re.findall(r'([^;\[]+)(?:\[.*?\])?;?)', dict['author'])
         else:
             lst_of_strings = [dict[field_to_search]]
         for value in lst_of_strings:
@@ -100,7 +102,7 @@ def do_get_line_rep(dict):
         family_n, given_n = author.split(',')
         init_lst = re.findall(r'\b[A-Z]', given_n)
         init_str = "".join(init_lst)
-        name_rep = family_n + " " + init_str
+        name_rep = family_n.strip() + " " + init_str
         authors_rep.append(name_rep)
     line_rep = ", ".join(authors_rep) + ' (' + dict['pub_date'] + '). ' + dict['title'] + '. ' + dict['venue']
     line_rep = re.sub(r'\s\[.*?\]', r'', line_rep)
