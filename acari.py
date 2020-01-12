@@ -39,9 +39,12 @@ def do_get_id_lst (my_regex, my_dict, retrieve_keys):
     output_lst = []
     for key in retrieve_keys:
         if key in my_dict.keys():
-            strings_lst = re.findall(r'([^;\[]+)(?:\[(.*?)\])?;?', my_dict[key])
+            if key == 'author' or key == 'id':
+                strings_lst = re.findall(r'([^;\[]+)(?:\[(.*?)\])?;?', my_dict[key])
+            else:
+                strings_lst = re.findall(r'([^\[]+)(?:\[(.*?)\])?', my_dict[key])
             for string, ids in strings_lst:
-                matchobj = re.match(r'' + my_regex + r'$', string.strip(), re.IGNORECASE)
+                matchobj = re.match(my_regex + r'$', string.strip(), re.IGNORECASE)
                 if matchobj:
                     if len(output_lst) == 0:
                         output_lst.extend(my_dict['id'].split('; '))
@@ -52,7 +55,7 @@ def do_get_id_lst (my_regex, my_dict, retrieve_keys):
 def do_get_ids(data, str_value, field_set):
     items = set()
     regex = re.sub(r'\\\*', r'.*?', re.escape(str_value))
-    if field_set is None:
+    if field_set is None or len(field_set) == 0:
         field_set = data[0].keys()
     for line in data:
         id_lst = do_get_id_lst(regex, line, field_set)
@@ -83,12 +86,12 @@ def recursive_field_search(dict, queue, result=None):
             return result
         elif field_to_search == 'id':
             lst_of_strings = dict['id'].split(';')
-        elif field_to_search == 'authors':
-            lst_of_strings = re.findall(r'([^;\[]+)(?:\[.*?\])?;?)', dict['author'])
+        elif field_to_search == 'author':
+            lst_of_strings = re.findall(r'([^;\[]+)(?:\[.*?\])?;?', dict[field_to_search])
         else:
-            lst_of_strings = [dict[field_to_search]]
+            lst_of_strings = [re.sub(r'\s\[.*?\]', r'', dict[field_to_search])]
         for value in lst_of_strings:
-            result = re.match(r'' + regex + r'$', value.strip(), re.IGNORECASE)
+            result = re.match(regex + r'$', value.strip(), re.IGNORECASE)
             if result is not None:
                 return recursive_field_search(dict, queue, result)
     else:
