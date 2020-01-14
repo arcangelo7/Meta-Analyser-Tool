@@ -26,13 +26,54 @@ import re
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import deque
-from itertools import product
+from itertools import product, tee
 
 
 def process_metadata(file_path):
     with open(file_path, 'r', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
-        return list(reader) # It returns a list of ordered dictionaries. It means that it keeps the order of the keys since Python 3.7
+        it1, it2, it3 = tee(reader, 3)
+        all_the_keys = dict()
+        for line in it1:
+            authors_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"]))
+            new_ids_set = set()
+            for author_and_id in authors_and_ids:
+                if "[" in author_and_id:
+                    ids = re.search(r'\[.*?\]', author_and_id).group()
+                    author_and_id = author_and_id.replace(ids, '').strip()
+
+                    ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";") # evita ; all'interno coglione!
+                    key_to_change = None
+                    for dict_keys in all_the_keys:
+                        for cur_id in ids_list:
+                            if cur_id in dict_keys:
+                                dict_keys_set = dict_keys.replace('[', '').replace(']', '').replace(' ', '').split(";")
+                                new_ids_set.update(dict_keys_set)
+                                new_ids_set.update(ids_list)
+                                key_to_change = dict_keys
+                    if key_to_change:
+                        all_the_keys["[" + "; ".join(new_ids_set) + "]"] = all_the_keys.pop(key_to_change)
+                    else:
+                        all_the_keys[ids] = author_and_id
+
+        counter = 0
+        for line in it2:
+            authors_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"]))
+            for author_and_id in authors_and_ids:
+                if "[" in author_and_id:
+                    ids = re.search(r'\[.*?\]', author_and_id).group()
+                    ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
+                    for list_of_keys in all_the_keys:
+                        for cur_id in ids_list:
+                            if cur_id in list_of_keys:
+                                new_line = line["author"].replace(ids, list_of_keys)
+                                line["author"] = new_line
+                else:
+                    new_line = line["author"].replace(author_and_id, author_and_id + " [acarid: " + str(counter) + "]")
+                    counter += 1
+                    line["author"] = new_line
+
+        return list(it3)
 
 
 def do_get_id_lst (my_regex, my_dict, retrieve_keys):
