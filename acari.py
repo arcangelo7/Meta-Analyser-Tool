@@ -165,21 +165,39 @@ def do_filter(data, field_value_list):
             items.append(do_get_line_rep(line))
 
 
+def merge_authors(coauthors_names, level_coauthors, dictionary):
+    id_regex = '\[.*?\]'
+    for level_coauthor in level_coauthors:
+        level_coauthor_id = re.search(id_regex, level_coauthor).group() if re.search(id_regex, level_coauthor) else id_regex
+        coauthors_names = {name if level_coauthor_id not in name else level_coauthor for name in coauthors_names}
+
+    for visited_author, visited_author_coauthors in dictionary.items():
+        key_id = re.search(id_regex, visited_author).group() if re.search(id_regex, visited_author) else id_regex
+        coauthors_names = {name if key_id not in name else visited_author for name in coauthors_names}
+        for visited_author_coauthor in visited_author_coauthors:
+            value_id = re.search(id_regex, visited_author_coauthor).group() if re.search(id_regex, visited_author_coauthor) else id_regex
+            coauthors_names = {name if value_id not in name else visited_author_coauthor for name in coauthors_names}
+    return coauthors_names
+
+
 def find_authors_recursively(data, authors_to_visit, visited_authors, dictionary, level):
     if level == 0:
         return dictionary
 
     level_coauthors = set()
+
     while len(authors_to_visit) > 0:
         author_to_visit = authors_to_visit.popleft()
+        author = None
         author_coauthors = set()
         for line in data:
-            if author_to_visit.lower() in line["author"].lower():
+            if author_to_visit in line["author"]:
                 authors_and_ids = [(name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"])]
-                is_an_id = re.findall('[^;]+' + re.escape(author_to_visit) + ']', line["author"])
-                author = is_an_id[0].strip() if is_an_id else author_to_visit
+                is_an_id = [(name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"]) if author_to_visit in name[1]]
+                author = is_an_id[0] if is_an_id else author_to_visit
                 visited_authors.add(author)
-                coauthors_names = {name.strip() for name in authors_and_ids if name.lower() != author.lower()}
+                coauthors_names = {name.strip() for name in authors_and_ids if name != author}
+                coauthors_names = merge_authors(coauthors_names, level_coauthors, dictionary)
                 author_coauthors.update(coauthors_names)
                 level_coauthors.update(coauthors_names)
         dictionary[author] = author_coauthors
@@ -190,7 +208,6 @@ def find_authors_recursively(data, authors_to_visit, visited_authors, dictionary
 
     level -= 1
     return find_authors_recursively(data, authors_to_visit, visited_authors, dictionary, level)
-    # Bug: it doesn't merge authors with the same id but different string
 
 
 def do_coauthor_graph(data, string_to_search, level):
