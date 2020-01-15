@@ -29,49 +29,70 @@ from collections import deque
 from itertools import product, tee
 
 
+def find_all_ids(iterator, new_iterator, ids_dictionary):
+    for name_and_id in iterator:
+        if "[" in name_and_id:
+            ids = re.search(r'\[.*?\]', name_and_id).group()
+            name = name_and_id.replace(ids, '').strip()
+            ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
+            key_to_change = None
+            for dict_keys in ids_dictionary:
+                for cur_id in ids_list:
+                    if cur_id in dict_keys:
+                        dict_keys_set = dict_keys.replace('[', '').replace(']', '').replace(' ', '').split(";")
+                        new_iterator.update(dict_keys_set)
+                        new_iterator.update(ids_list)
+                        key_to_change = dict_keys
+            if key_to_change:
+                ids_dictionary["[" + "; ".join(new_iterator) + "]"] = ids_dictionary.pop(key_to_change)
+            else:
+                ids_dictionary[ids] = name
+
+
+def add_all_ids(line, ids_dictionary, field, counter):
+    name_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line[field]))
+    for name_and_id in name_and_ids:
+        if "[" in name_and_id:
+            ids = re.search(r'\[.*?\]', name_and_id).group()
+            ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
+            for list_of_keys in ids_dictionary:
+                for cur_id in ids_list:
+                    if cur_id in list_of_keys:
+                        new_line = line[field].replace(ids, list_of_keys)
+                        line[field] = new_line
+        else:
+            new_line = line[field].replace(name_and_id, name_and_id + " [acarid: " + str(counter[0]) + "]")
+            counter[0] += 1
+            line[field] = new_line
+
+
 def process_metadata(file_path):
     with open(file_path, 'r', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
         it1, it2, it3 = tee(reader, 3)
-        all_the_keys = dict()
+
+        all_the_author_keys = dict()
+        all_the_venue_keys = dict()
+        all_the_publisher_keys = dict()
+
         for line in it1:
             authors_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"]))
-            new_ids_set = set()
-            for author_and_id in authors_and_ids:
-                if "[" in author_and_id:
-                    ids = re.search(r'\[.*?\]', author_and_id).group()
-                    author_and_id = author_and_id.replace(ids, '').strip()
+            venue_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["venue"]))
+            publisher_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["publisher"]))
 
-                    ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";") # evita ; all'interno coglione!
-                    key_to_change = None
-                    for dict_keys in all_the_keys:
-                        for cur_id in ids_list:
-                            if cur_id in dict_keys:
-                                dict_keys_set = dict_keys.replace('[', '').replace(']', '').replace(' ', '').split(";")
-                                new_ids_set.update(dict_keys_set)
-                                new_ids_set.update(ids_list)
-                                key_to_change = dict_keys
-                    if key_to_change:
-                        all_the_keys["[" + "; ".join(new_ids_set) + "]"] = all_the_keys.pop(key_to_change)
-                    else:
-                        all_the_keys[ids] = author_and_id
+            new_author_ids_set = set()
+            new_venue_ids_set = set()
+            new_publisher_ids_set = set()
 
-        counter = 0
+            find_all_ids(authors_and_ids, new_author_ids_set, all_the_author_keys)
+            find_all_ids(venue_and_ids, new_venue_ids_set, all_the_venue_keys)
+            find_all_ids(publisher_and_ids, new_publisher_ids_set, all_the_publisher_keys)
+
+        counter = [0] # Must be mutable to change, otherwise it is copied everytime and restarts from zero
         for line in it2:
-            authors_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"]))
-            for author_and_id in authors_and_ids:
-                if "[" in author_and_id:
-                    ids = re.search(r'\[.*?\]', author_and_id).group()
-                    ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
-                    for list_of_keys in all_the_keys:
-                        for cur_id in ids_list:
-                            if cur_id in list_of_keys:
-                                new_line = line["author"].replace(ids, list_of_keys)
-                                line["author"] = new_line
-                else:
-                    new_line = line["author"].replace(author_and_id, author_and_id + " [acarid: " + str(counter) + "]")
-                    counter += 1
-                    line["author"] = new_line
+            add_all_ids(line, all_the_author_keys, "author", counter)
+            add_all_ids(line, all_the_venue_keys, "venue", counter)
+            add_all_ids(line, all_the_publisher_keys, "publisher", counter)
 
         return list(it3)
 
