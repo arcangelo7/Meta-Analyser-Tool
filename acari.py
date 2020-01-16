@@ -28,132 +28,136 @@ import matplotlib.pyplot as plt
 from collections import deque
 from itertools import product, tee
 
+
+def find_all_ids(ids_set, new_ids_set, ids_dictionary):
+    for name_and_id in ids_set:
+        if "[" in name_and_id:
+            ids = re.search(r'\[.*?\]', name_and_id).group()
+            name = name_and_id.replace(ids, '').strip()
+            ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
+            key_to_change = None
+            for dict_keys, cur_id in product(ids_dictionary, ids_list):
+                if cur_id in dict_keys:
+                    dict_keys_set = dict_keys.replace('[', '').replace(']', '').replace(' ', '').split(";")
+                    new_ids_set.update(dict_keys_set)
+                    new_ids_set.update(ids_list)
+                    key_to_change = dict_keys
+                    break
+            if key_to_change:
+                ids_dictionary["[" + "; ".join(new_ids_set) + "]"] = ids_dictionary.pop(key_to_change)
+            else:
+                ids_dictionary[ids] = name
+
+
+def add_all_ids(line, ids_dictionary, field, counter):
+    name_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line[field]))
+    for name_and_id in name_and_ids:
+        if "[" in name_and_id:
+            ids = re.search(r'\[.*?\]', name_and_id).group()
+            ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
+            for list_of_keys, cur_id in product(ids_dictionary, ids_list):
+                if cur_id in list_of_keys:
+                    new_line = line[field].replace(ids, list_of_keys)
+                    line[field] = new_line
+                    break
+        else:
+            new_line = line[field].replace(name_and_id, name_and_id + " [acarid: " + str(counter[0]) + "]")
+            counter[0] += 1
+            line[field] = new_line
+
+
 def process_metadata(file_path):
     with open(file_path, 'r', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
         it1, it2, it3 = tee(reader, 3)
-        all_the_ids = list()
+
+        all_the_author_keys = dict()
+        all_the_venue_keys = dict()
+        all_the_publisher_keys = dict()
+
         for line in it1:
-            for key in line:
-                line_ids = set((ids for ids in re.findall(r'[^;\[]+(?:\[(.*?)\])?;?', line[key]) if ids != ''))
-                for ids in line_ids:
-                    new_ids = set()
-                    ids_list = ids.split('; ')
-                    idx_to_change = list()
-                    for founded_ids in all_the_ids:
-                        founded_ids_lst = founded_ids.split("; ")
-                        for cur_id in ids_list:
-                            if cur_id in founded_ids_lst:
-                                idx_to_change.append(all_the_ids.index(founded_ids))
-                                new_ids.update(ids_list)
-                                new_ids.update(founded_ids_lst)
-                    if len(idx_to_change) > 0:
-                        for idx in idx_to_change:
-                            all_the_ids[idx] = '; '.join(new_ids)
-                    else:
-                        all_the_ids.append(ids)
-        all_the_ids_set = set(all_the_ids)
-        counter = 0
+            authors_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"]))
+            venue_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["venue"]))
+            publisher_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["publisher"]))
+
+            new_author_ids_set = set()
+            new_venue_ids_set = set()
+            new_publisher_ids_set = set()
+
+            find_all_ids(authors_and_ids, new_author_ids_set, all_the_author_keys)
+            find_all_ids(venue_and_ids, new_venue_ids_set, all_the_venue_keys)
+            find_all_ids(publisher_and_ids, new_publisher_ids_set, all_the_publisher_keys)
+
+        counter = [0] # Must be mutable to change, otherwise it is copied everytime and restarts from zero
         for line in it2:
-            for key in line:
-                if key in ['author', 'venue', 'publisher']:
-                    string_ids = set(re.findall(r'([^;\[]+)(?:\[(.*?)\])?;?', line[key]))
-                    for string, id in string_ids:
-                        if id == '':
-                            new_line = line[key].replace(string.strip(), string.strip() + " [acarid: " + str(counter) + "]")
-                            line[key] = new_line
-                            counter += 1
-                        else:
-                            for id1 in id.split('; '):
-                                for complete_ids in all_the_ids_set:
-                                    if id1 in complete_ids.split('; '):
-                                        new_line = line[key].replace(id, complete_ids)
-                                        line[key] = new_line
+            add_all_ids(line, all_the_author_keys, "author", counter)
+            add_all_ids(line, all_the_venue_keys, "venue", counter)
+            add_all_ids(line, all_the_publisher_keys, "publisher", counter)
+
         return list(it3)
-# def find_all_ids(iterator, new_iterator, ids_dictionary):
-#     for name_and_id in iterator:
-#         if "[" in name_and_id:
-#             ids = re.search(r'\[.*?\]', name_and_id).group()
-#             name = name_and_id.replace(ids, '').strip()
-#             ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
-#             key_to_change = None
-#             for dict_keys in ids_dictionary:
-#                 for cur_id in ids_list:
-#                     if cur_id in dict_keys:
-#                         dict_keys_set = dict_keys.replace('[', '').replace(']', '').replace(' ', '').split(";")
-#                         new_iterator.update(dict_keys_set)
-#                         new_iterator.update(ids_list)
-#                         key_to_change = dict_keys
-#             if key_to_change:
-#                 ids_dictionary["[" + "; ".join(new_iterator) + "]"] = ids_dictionary.pop(key_to_change)
-#             else:
-#                 ids_dictionary[ids] = name
-#
-#
-# def add_all_ids(line, ids_dictionary, field, counter):
-#     name_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line[field]))
-#     for name_and_id in name_and_ids:
-#         if "[" in name_and_id:
-#             ids = re.search(r'\[.*?\]', name_and_id).group()
-#             ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
-#             for list_of_keys in ids_dictionary:
-#                 for cur_id in ids_list:
-#                     if cur_id in list_of_keys:
-#                         new_line = line[field].replace(ids, list_of_keys)
-#                         line[field] = new_line
-#         else:
-#             new_line = line[field].replace(name_and_id, name_and_id + " [acarid: " + str(counter[0]) + "]")
-#             counter[0] += 1
-#             line[field] = new_line
-#
-#
+
+
 # def process_metadata(file_path):
 #     with open(file_path, 'r', encoding='utf-8') as csvfile:
 #         reader = csv.DictReader(csvfile)
 #         it1, it2, it3 = tee(reader, 3)
-#
-#         all_the_author_keys = dict()
-#         all_the_venue_keys = dict()
-#         all_the_publisher_keys = dict()
-#
+#         all_the_ids = list()
 #         for line in it1:
-#             authors_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"]))
-#             venue_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["venue"]))
-#             publisher_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["publisher"]))
-#
-#             new_author_ids_set = set()
-#             new_venue_ids_set = set()
-#             new_publisher_ids_set = set()
-#
-#             find_all_ids(authors_and_ids, new_author_ids_set, all_the_author_keys)
-#             find_all_ids(venue_and_ids, new_venue_ids_set, all_the_venue_keys)
-#             find_all_ids(publisher_and_ids, new_publisher_ids_set, all_the_publisher_keys)
-#
-#         counter = [0] # Must be mutable to change, otherwise it is copied everytime and restarts from zero
+#             for key in line:
+#                 if key in ["author", "venue", "publisher"]:
+#                     line_ids = [ids for ids in re.findall(r'\[(.*?)\];?', line[key]) if ids != '']
+#                     for ids in line_ids:
+#                         new_ids = set()
+#                         ids_list = ids.split('; ')
+#                         idx_to_change = list()
+#                         for found_ids in all_the_ids:
+#                             found_ids_lst = found_ids.split("; ")
+#                             for cur_id in ids_list:
+#                                 if cur_id in found_ids_lst:
+#                                     idx_to_change.append(all_the_ids.index(found_ids))
+#                                     new_ids.update(ids_list)
+#                                     new_ids.update(found_ids_lst)
+#                         if len(idx_to_change) > 0:
+#                             for idx in idx_to_change:
+#                                 all_the_ids[idx] = '; '.join(new_ids)
+#                         else:
+#                             all_the_ids.append(ids)
+#         all_the_ids_set = set(all_the_ids)
+#         counter = 0
 #         for line in it2:
-#             add_all_ids(line, all_the_author_keys, "author", counter)
-#             add_all_ids(line, all_the_venue_keys, "venue", counter)
-#             add_all_ids(line, all_the_publisher_keys, "publisher", counter)
-#
+#             for key in line:
+#                 if key in ['author', 'venue', 'publisher']:
+#                     string_ids = re.findall(r'([^;\[]+)(?:\[(.*?)\])?;?', line[key])
+#                     for string, id in string_ids:
+#                         if id == '':
+#                             new_line = line[key].replace(string.strip(), string.strip() + " [acarid: " + str(counter) + "]")
+#                             line[key] = new_line
+#                             counter += 1
+#                         else:
+#                             for id1 in id.split('; '):
+#                                 for complete_ids in all_the_ids_set:
+#                                     if id1 in complete_ids.split('; '):
+#                                         new_line = line[key].replace(id, complete_ids)
+#                                         line[key] = new_line
 #         return list(it3)
-#
-#
-# def do_get_id_lst (my_regex, my_dict, retrieve_keys):
-#     output_lst = []
-#     for key in retrieve_keys:
-#         if key in my_dict.keys():
-#             if key == 'author' or key == 'id':
-#                 strings_lst = re.findall(r'([^;\[]+)(?:\[(.*?)\])?;?', my_dict[key])
-#             else:
-#                 strings_lst = re.findall(r'([^\[]+)(?:\[(.*?)\])?', my_dict[key])
-#             for string, ids in strings_lst:
-#                 matchobj = re.match(my_regex + r'$', string.strip(), re.IGNORECASE)
-#                 if matchobj:
-#                     if len(output_lst) == 0:
-#                         output_lst.extend(my_dict['id'].split('; '))
-#                     if ids != '':
-#                         output_lst.extend(ids.split('; '))
-#     return output_lst
+
+
+def do_get_id_lst (my_regex, my_dict, retrieve_keys):
+    output_lst = []
+    for key in retrieve_keys:
+        if key in my_dict.keys():
+            if key == 'author' or key == 'id':
+                strings_lst = re.findall(r'([^;\[]+)(?:\[(.*?)\])?;?', my_dict[key])
+            else:
+                strings_lst = re.findall(r'([^\[]+)(?:\[(.*?)\])?', my_dict[key])
+            for string, ids in strings_lst:
+                matchobj = re.match(my_regex + r'$', string.strip(), re.IGNORECASE)
+                if matchobj:
+                    if len(output_lst) == 0:
+                        output_lst.extend(my_dict['id'].split('; '))
+                    if ids != '':
+                        output_lst.extend(ids.split('; '))
+    return output_lst
 
 def do_get_ids(data, str_value, field_set):
     items = set()
