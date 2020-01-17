@@ -24,7 +24,6 @@ import csv
 from anytree import Node, search
 import re
 import networkx as nx
-import matplotlib.pyplot as plt
 from collections import deque
 from itertools import product, tee
 
@@ -32,29 +31,29 @@ from itertools import product, tee
 def find_all_ids(ids_set, new_ids_set, ids_dictionary):
     for name_and_id in ids_set:
         if "[" in name_and_id:
-            ids = re.search(r'\[.*?\]', name_and_id).group()
-            name = name_and_id.replace(ids, '').strip()
-            ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
+            ids = re.findall(r'\[(.*?)\](?=;|$)', name_and_id)[0]
+            name = name_and_id.replace(ids, '').replace('[', '').replace(']', '').strip()
+            ids_list = ids.replace(' ', '').split(";")
             key_to_change = None
             for dict_keys, cur_id in product(ids_dictionary, ids_list):
                 if cur_id in dict_keys:
-                    dict_keys_set = dict_keys.replace('[', '').replace(']', '').replace(' ', '').split(";")
+                    dict_keys_set = dict_keys.replace(' ', '').split(";")
                     new_ids_set.update(dict_keys_set)
                     new_ids_set.update(ids_list)
                     key_to_change = dict_keys
                     break
             if key_to_change:
-                ids_dictionary["[" + "; ".join(new_ids_set) + "]"] = ids_dictionary.pop(key_to_change)
+                ids_dictionary["; ".join(new_ids_set)] = ids_dictionary.pop(key_to_change)
             else:
                 ids_dictionary[ids] = name
 
 
 def add_all_ids(line, ids_dictionary, field, counter):
-    name_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line[field]))
+    name_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?(?:;|$)', line[field]))
     for name_and_id in name_and_ids:
         if "[" in name_and_id:
-            ids = re.search(r'\[.*?\]', name_and_id).group()
-            ids_list = ids.replace('[', '').replace(']', '').replace(' ', '').split(";")
+            ids = re.findall(r'\[(.*?)\](?=;|$)', name_and_id)[0]
+            ids_list = ids.replace(' ', '').split(";")
             for list_of_keys, cur_id in product(ids_dictionary, ids_list):
                 if cur_id in list_of_keys:
                     new_line = line[field].replace(ids, list_of_keys)
@@ -76,9 +75,9 @@ def process_metadata(file_path):
         all_the_publisher_keys = dict()
 
         for line in it1:
-            authors_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"]))
-            venue_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["venue"]))
-            publisher_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["publisher"]))
+            authors_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["author"]))
+            venue_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["venue"]))
+            publisher_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["publisher"]))
 
             new_author_ids_set = set()
             new_venue_ids_set = set()
@@ -93,6 +92,13 @@ def process_metadata(file_path):
             add_all_ids(line, all_the_author_keys, "author", counter)
             add_all_ids(line, all_the_venue_keys, "venue", counter)
             add_all_ids(line, all_the_publisher_keys, "publisher", counter)
+
+        # toCSV = list(it3)
+        # keys = toCSV[0].keys()
+        # with open('ouput.csv', 'w', encoding='utf-8') as output_file:
+        #     dict_writer = csv.DictWriter(output_file, keys)
+        #     dict_writer.writeheader()
+        #     dict_writer.writerows(toCSV)
 
         return list(it3)
 
@@ -113,6 +119,7 @@ def do_get_id_lst (my_regex, my_dict, retrieve_keys):
                     if ids != '':
                         output_lst.extend(ids.split('; '))
     return output_lst
+
 
 def do_get_ids(data, str_value, field_set):
     items = set()
@@ -187,7 +194,7 @@ def do_filter(data, field_value_list):
 
 
 def merge_authors(coauthors_names, level_coauthors, dictionary):
-    id_regex = '\[.*?\]'
+    id_regex = '\[.*?\](?=;|$)'
     for level_coauthor in level_coauthors:
         level_coauthor_id = re.search(id_regex, level_coauthor).group() if re.search(id_regex, level_coauthor) else id_regex
         coauthors_names = {name if level_coauthor_id not in name else level_coauthor for name in coauthors_names}
@@ -213,8 +220,8 @@ def find_authors_recursively(data, authors_to_visit, visited_authors, dictionary
         author_coauthors = set()
         for line in data:
             if author_to_visit in line["author"]:
-                authors_and_ids = [(name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"])]
-                is_an_id = [(name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?;?', line["author"]) if author_to_visit in name[1]]
+                authors_and_ids = [(name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["author"])]
+                is_an_id = [(name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["author"]) if author_to_visit in name[1]]
                 author = is_an_id[0] if is_an_id else author_to_visit
                 visited_authors.add(author)
                 coauthors_names = {name.strip() for name in authors_and_ids if name != author}
@@ -256,10 +263,10 @@ def do_author_network(mdata):
 
 def build_tree(root, line, venues_found):
     if line["venue"] != "":
-        id_values = re.findall(r'\[.*?\]', line["venue"])[0]
+        id_values = re.findall(r'\[.*?\](?=;|$)', line["venue"])[0]
         if id_values not in venues_found:
             venues_found.add(id_values)
-            node_name = re.findall(r'([^;\[]+)(?:\[.*?\])', line["venue"])[0].strip()
+            node_name = re.findall(r'([^;\[]+)(?:\[.*?\])(?:;|$)', line["venue"])[0].strip()
             venue_node = Node(node_name, root, id=id_values)
             if line["volume"] != "":
                 volume_node = Node(line["volume"], venue_node)
