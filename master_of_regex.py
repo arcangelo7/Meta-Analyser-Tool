@@ -1,8 +1,8 @@
 import csv
 import re
 
-master_of_regex = r'([^;\[]+)(\[.*?\])?;?'
-authorsinitials = '([\w][^\s,]*)(?:,?(\s[A-Z])[^\s\.\-]*(?:[\.\-\s]+([A-Z])[^\.\s\-]*)*)?'
+master_of_regex = r'([^;\[]+)(\[.*?\])(?:;|$)'
+#finds a tuple with tuple[0] = author's name, tuple[1] = id
 
 with open('metadata_sample.csv', 'r', encoding='utf-8') as csvfile:
     reader = csv.DictReader(csvfile)
@@ -14,20 +14,16 @@ for line in data:
 
 authors_list = list()
 for author in authors:
-    x = re.findall(r'([^;\[]+)(\[.*?\])?;?', author)
+    x = re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', author)
     authors_list.extend(x)
 print(authors_list[0:10])
 
 authors_name = list()
 for authors_tuple in authors_list:
     authors_name.append(authors_tuple[0])
+authors_id = list()
+for authors_tuple in authors_list:
+    authors_id.append(authors_tuple[1])
 
-test_list = authors_name[0:100]
-authors_rep = list()
-for author in test_list:
-    rep = re.findall('([\w][^\s,]*)(?:,?(\s[A-Z])[^\s\.-]*(?:[\.\-\s]+([A-Z])[^\.\s-]*)*)?', author)
-    authors_rep.append(''.join(rep[0]))
-
-print(authors_rep)
-
-
+print(authors_name)
+print(authors_id)
