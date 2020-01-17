@@ -97,51 +97,6 @@ def process_metadata(file_path):
         return list(it3)
 
 
-# def process_metadata(file_path):
-#     with open(file_path, 'r', encoding='utf-8') as csvfile:
-#         reader = csv.DictReader(csvfile)
-#         it1, it2, it3 = tee(reader, 3)
-#         all_the_ids = list()
-#         for line in it1:
-#             for key in line:
-#                 if key in ["author", "venue", "publisher"]:
-#                     line_ids = [ids for ids in re.findall(r'\[(.*?)\];?', line[key]) if ids != '']
-#                     for ids in line_ids:
-#                         new_ids = set()
-#                         ids_list = ids.split('; ')
-#                         idx_to_change = list()
-#                         for found_ids in all_the_ids:
-#                             found_ids_lst = found_ids.split("; ")
-#                             for cur_id in ids_list:
-#                                 if cur_id in found_ids_lst:
-#                                     idx_to_change.append(all_the_ids.index(found_ids))
-#                                     new_ids.update(ids_list)
-#                                     new_ids.update(found_ids_lst)
-#                         if len(idx_to_change) > 0:
-#                             for idx in idx_to_change:
-#                                 all_the_ids[idx] = '; '.join(new_ids)
-#                         else:
-#                             all_the_ids.append(ids)
-#         all_the_ids_set = set(all_the_ids)
-#         counter = 0
-#         for line in it2:
-#             for key in line:
-#                 if key in ['author', 'venue', 'publisher']:
-#                     string_ids = re.findall(r'([^;\[]+)(?:\[(.*?)\])?;?', line[key])
-#                     for string, id in string_ids:
-#                         if id == '':
-#                             new_line = line[key].replace(string.strip(), string.strip() + " [acarid: " + str(counter) + "]")
-#                             line[key] = new_line
-#                             counter += 1
-#                         else:
-#                             for id1 in id.split('; '):
-#                                 for complete_ids in all_the_ids_set:
-#                                     if id1 in complete_ids.split('; '):
-#                                         new_line = line[key].replace(id, complete_ids)
-#                                         line[key] = new_line
-#         return list(it3)
-
-
 def do_get_id_lst (my_regex, my_dict, retrieve_keys):
     output_lst = []
     for key in retrieve_keys:
@@ -300,29 +255,35 @@ def do_author_network(mdata):
 
 
 def build_tree(root, line, venues_found):
-    global existing_volume
-    if line["venue"] not in venues_found and line["venue"] != "":
-        venues_found.add(line["venue"])
-        venue_node = Node(line["venue"], root)
-        if line["volume"] != "":
-            volume_node = Node(line["volume"], venue_node)
-        if line["issue"] != "":
-            Node(line["issue"], volume_node)
-    else:
-        venue_node = search.find(root, lambda node: node.name == line["venue"], maxlevel=2)
-        if venue_node is not None:
-            existing_volume = search.findall(venue_node, lambda node: node.name == line["volume"], maxlevel=3)
-        if not existing_volume and line["volume"] != "":
-            volume_node = Node(line["volume"], venue_node)
-            if line["issue"] != "":
-                Node(line["issue"], volume_node)
+    if line["venue"] != "":
+        id_values = re.findall(r'\[.*?\]', line["venue"])[0]
+        if id_values not in venues_found:
+            venues_found.add(id_values)
+            node_name = re.findall(r'([^;\[]+)(?:\[.*?\])', line["venue"])[0].strip()
+            venue_node = Node(node_name, root, id=id_values)
+            if line["volume"] != "":
+                volume_node = Node(line["volume"], venue_node)
+                if line["issue"] != "":
+                    Node(line["issue"], volume_node)
+        elif id_values in venues_found:
+            venue_node = search.findall_by_attr(root, name="id", value=id_values, maxlevel=2)[0]
+            if venue_node is not None and line["volume"] != "":
+                existing_volume = search.findall(venue_node, lambda node: node.name == line["volume"], maxlevel=3)
+                if not existing_volume:
+                    volume_node = Node(line["volume"], venue_node)
+                    if line["issue"] != "":
+                        Node(line["issue"], volume_node)
+                elif existing_volume:
+                    existing_issue = search.findall(existing_volume[0], lambda node: node.name == line["issue"], maxlevel=4)
+                    if not existing_issue and line["issue"] != "":
+                        Node(line["issue"], existing_volume[0])
 
 
 def do_retrieve_tree_of_venues(data, no_ids):
     root = Node("venues")
     venues_found = set()
     for line in data:
-        if no_ids is None:
+        if no_ids is None or len(no_ids) == 0:
             build_tree(root, line, venues_found)
         else:
             for id in no_ids:
