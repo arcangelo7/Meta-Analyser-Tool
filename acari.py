@@ -107,17 +107,27 @@ def do_get_id_lst (my_regex, my_dict, retrieve_keys):
     output_lst = []
     for key in retrieve_keys:
         if key in my_dict.keys():
-            if key == 'author' or key == 'id':
-                strings_lst = re.findall(r'([^;\[]+)(?:\[(.*?)\])?;?', my_dict[key])
+            if key in {'author', 'venue', 'publisher'}:
+                strings_lst = re.findall(r'([^;\[]+)\[(.*?)\](?:;|$)', my_dict[key])
+                for string, ids in strings_lst:
+                    matchobj = re.match(my_regex + r'$', string.strip(), re.IGNORECASE)
+                    if matchobj:
+                        if len(output_lst) == 0:
+                            output_lst.extend(my_dict['id'].split('; '))
+                        if 'acari' not in ids:
+                            output_lst.extend(ids.split('; '))
+            elif key == 'id':
+                strings_lst = my_dict[key].split('; ')
+                for string in strings_lst:
+                    matchobj = re.match(my_regex + r'$', string, re.IGNORECASE)
+                    if matchobj:
+                        if len(output_lst) == 0:
+                            output_lst.extend(my_dict['id'].split('; '))
             else:
-                strings_lst = re.findall(r'([^\[]+)(?:\[(.*?)\])?', my_dict[key])
-            for string, ids in strings_lst:
-                matchobj = re.match(my_regex + r'$', string.strip(), re.IGNORECASE)
+                matchobj = re.match(my_regex + r'$', my_dict[key], re.IGNORECASE)
                 if matchobj:
                     if len(output_lst) == 0:
                         output_lst.extend(my_dict['id'].split('; '))
-                    if ids != '':
-                        output_lst.extend(ids.split('; '))
     return output_lst
 
 
@@ -146,39 +156,36 @@ def do_get_by_id(data, id, field_set):
     return items
 
 
+def do_get_line_rep(dict):
+    authors_rep = []
+    authors_collection = re.findall(r'([^;\[]+)\[.*?\](?:;|$)', dict['author'])
+    for author in authors_collection:
+        family_n_given_n = author.split(',')
+        init_lst = re.findall(r'\b[A-Z]', family_n_given_n[-1])
+        init_str = "".join(init_lst)
+        name_rep = family_n_given_n[0].strip() + " " + init_str
+        authors_rep.append(name_rep)
+    line_rep = ", ".join(authors_rep) + ' (' + dict['pub_date'] + '). ' + dict['title'] + '. ' + dict['venue']
+    line_rep = re.sub(r'\s\[.*?\](?=;|$)', r'', line_rep)
+    return line_rep
+
+
 def recursive_field_search(dict, queue, result=None):
     if len(queue) > 0:
         curr_tuple = queue.pop()
         regex = re.sub(r'\\\*', r'.*?', re.escape(curr_tuple[1]))
         field_to_search = curr_tuple[0]
         if field_to_search not in dict.keys():
-            return result
-        elif field_to_search == 'id':
-            lst_of_strings = dict['id'].split(';')
-        elif field_to_search == 'author':
-            lst_of_strings = re.findall(r'([^;\[]+)(?:\[.*?\])?;?', dict[field_to_search])
+            return None
         else:
-            lst_of_strings = [re.sub(r'\s\[.*?\]', r'', dict[field_to_search])]
-        for value in lst_of_strings:
-            result = re.match(regex + r'$', value.strip(), re.IGNORECASE)
-            if result is not None:
-                return recursive_field_search(dict, queue, result)
+            no_id_str = re.sub(r'\s\[.*?\](?=;|$)', r'', dict[field_to_search])
+            lst_of_strings = no_id_str.split(';')
+            for string in lst_of_strings:
+                result = re.match(regex + r'$', string.strip(), re.IGNORECASE)
+                if result is not None:
+                    return recursive_field_search(dict, queue, result)
     else:
         return result
-
-
-def do_get_line_rep(dict):
-    authors_rep = []
-    authors_collection = re.findall(r'([^;\[]+)(?:\[.*?\])?;?', dict['author'])
-    for author in authors_collection:
-        family_n, given_n = author.split(',')
-        init_lst = re.findall(r'\b[A-Z]', given_n)
-        init_str = "".join(init_lst)
-        name_rep = family_n.strip() + " " + init_str
-        authors_rep.append(name_rep)
-    line_rep = ", ".join(authors_rep) + ' (' + dict['pub_date'] + '). ' + dict['title'] + '. ' + dict['venue']
-    line_rep = re.sub(r'\s\[.*?\]', r'', line_rep)
-    return line_rep
 
 
 def do_filter(data, field_value_list):
@@ -191,6 +198,7 @@ def do_filter(data, field_value_list):
                 items.append(do_get_line_rep(line))
         else:
             items.append(do_get_line_rep(line))
+    return items
 
 
 def merge_authors(coauthors_names, level_coauthors, dictionary):
