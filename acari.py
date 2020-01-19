@@ -143,17 +143,23 @@ def do_get_ids(data, str_value, field_set):
 
 
 def do_get_by_id(data, id, field_set):
-    items = set()
-    for line in data:
-        if field_set is not None:
-            for field in field_set:
-                if id in line[field]:
-                    items.add(line[field])
-        else:
-            for key, value in line.items():
+    list_of_papers = []
+    set_of_reps = set()
+
+    for row in data:
+        if field_set is None or len(field_set) == 0:
+            for key, value in row.items():
                 if id in value:
-                    items.add(value)
-    return items
+                    list_of_papers.append(row)
+        else:
+            for field in field_set:
+                if id in row[field]:
+                    list_of_papers.append(row)
+
+    for dictionary in list_of_papers:
+        set_of_reps.add(do_get_line_rep(dictionary))
+
+    return set_of_reps
 
 
 def do_get_line_rep(dict):
@@ -255,17 +261,17 @@ def do_coauthor_graph(data, string_to_search, level):
     return coauthor_graph
 
 
-def do_author_network(mdata):
-    coauthgraph = nx.MultiGraph()
-    for row in mdata:
-        auths = {aut.strip() for aut in row['author'].split(';')}
-        for aut1, aut2 in product(auths,auths):
+def do_author_network(data):
+    coauthgraph = nx.Graph()
+    for row in data:
+        auths = {"".join(aut).strip() for aut in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', row['author'])}
+        for aut1, aut2 in product(auths, auths):
             if not coauthgraph.has_node(aut1):
                 coauthgraph.add_node(aut1)
             if not coauthgraph.has_node(aut2):
                 coauthgraph.add_node(aut2)
-            if(aut1 != aut2) and not coauthgraph.has_edge(aut1, aut2):
-                coauthgraph.add_edge(aut1,aut2)
+            if aut1 != aut2 and not coauthgraph.has_edge(aut1, aut2):
+                coauthgraph.add_edge(aut1, aut2)
     return coauthgraph
 
 
