@@ -209,14 +209,14 @@ def do_filter(data, field_value_list):
 def merge_authors(coauthors_names, level_coauthors, dictionary):
     id_regex = '\[.*?\](?=;|$)'
     for level_coauthor in level_coauthors:
-        level_coauthor_id = re.search(id_regex, level_coauthor).group() if re.search(id_regex, level_coauthor) else id_regex
+        level_coauthor_id = re.search(id_regex, level_coauthor).group()
         coauthors_names = {name if level_coauthor_id not in name else level_coauthor for name in coauthors_names}
 
     for visited_author, visited_author_coauthors in dictionary.items():
-        key_id = re.search(id_regex, visited_author).group() if re.search(id_regex, visited_author) else id_regex
+        key_id = re.search(id_regex, visited_author).group()
         coauthors_names = {name if key_id not in name else visited_author for name in coauthors_names}
         for visited_author_coauthor in visited_author_coauthors:
-            value_id = re.search(id_regex, visited_author_coauthor).group() if re.search(id_regex, visited_author_coauthor) else id_regex
+            value_id = re.search(id_regex, visited_author_coauthor).group()
             coauthors_names = {name if value_id not in name else visited_author_coauthor for name in coauthors_names}
     return coauthors_names
 
