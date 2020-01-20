@@ -116,9 +116,9 @@ def do_get_id_set (my_regex, my_dict, retrieve_keys):
                         if 'acari' not in ids:
                             output_set.update([id.strip() for id in ids.split(';')])
             elif key == 'id':
-                strings_lst = my_dict[key].split('; ')
+                strings_lst = my_dict[key].split(';')
                 for string in strings_lst:
-                    matchobj = re.match(my_regex + r'$', string, re.IGNORECASE)
+                    matchobj = re.match(my_regex + r'$', string.strip(), re.IGNORECASE)
                     if matchobj:
                         output_set.update([itemid.strip() for itemid in my_dict['id'].split(';')])
             else:
