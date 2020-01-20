@@ -103,8 +103,8 @@ def process_metadata(file_path):
         return list(it3)
 
 
-def do_get_id_lst (my_regex, my_dict, retrieve_keys):
-    output_lst = []
+def do_get_id_set (my_regex, my_dict, retrieve_keys):
+    output_set = set()
     for key in retrieve_keys:
         if key in my_dict.keys():
             if key in {'author', 'venue', 'publisher'}:
@@ -112,24 +112,20 @@ def do_get_id_lst (my_regex, my_dict, retrieve_keys):
                 for string, ids in strings_lst:
                     matchobj = re.match(my_regex + r'$', string.strip(), re.IGNORECASE)
                     if matchobj:
-                        if len(output_lst) == 0:
-                            output_lst.extend(my_dict['id'].split('; '))
+                        output_set.update([itemid.strip() for itemid in my_dict['id'].split(';')])
                         if 'acari' not in ids:
-                            output_lst.extend(ids.split('; '))
+                            output_set.update([id.strip() for id in ids.split(';')])
             elif key == 'id':
                 strings_lst = my_dict[key].split('; ')
                 for string in strings_lst:
                     matchobj = re.match(my_regex + r'$', string, re.IGNORECASE)
                     if matchobj:
-                        if len(output_lst) == 0:
-                            output_lst.extend(my_dict['id'].split('; '))
+                        output_set.update([itemid.strip() for itemid in my_dict['id'].split(';')])
             else:
                 matchobj = re.match(my_regex + r'$', my_dict[key], re.IGNORECASE)
                 if matchobj:
-                    if len(output_lst) == 0:
-                        output_lst.extend(my_dict['id'].split('; '))
-    return output_lst
-
+                    output_set.update([itemid.strip() for itemid in my_dict['id'].split(';')])
+    return output_set
 
 def do_get_ids(data, str_value, field_set):
     items = set()
@@ -137,8 +133,8 @@ def do_get_ids(data, str_value, field_set):
     if field_set is None or len(field_set) == 0:
         field_set = data[0].keys()
     for line in data:
-        id_lst = do_get_id_lst(regex, line, field_set)
-        items.update(id_lst)
+        id_set = do_get_id_set(regex, line, field_set)
+        items.update(id_set)
     return items
 
 
@@ -166,19 +162,22 @@ def do_get_line_rep(dict):
     authors_rep = []
     authors_collection = re.findall(r'([^;\[]+)\[.*?\](?:;|$)', dict['author'])
     for author in authors_collection:
-        family_n_given_n = author.split(',')
-        init_lst = re.findall(r'\b[A-Z]', family_n_given_n[-1])
-        init_str = "".join(init_lst)
-        name_rep = family_n_given_n[0].strip() + " " + init_str
-        authors_rep.append(name_rep)
+        if ',' in author:
+            family_n_given_n = author.split(',')
+            init_lst = re.findall(r'\b[A-Z]', family_n_given_n[1])
+            init_str = "".join(init_lst)
+            name_rep = family_n_given_n[0].strip() + " " + init_str
+            authors_rep.append(name_rep)
+        else:
+            authors_rep.append(author.strip())
     line_rep = ", ".join(authors_rep) + ' (' + dict['pub_date'] + '). ' + dict['title'] + '. ' + dict['venue']
     line_rep = re.sub(r'\s\[.*?\](?=;|$)', r'', line_rep)
     return line_rep
 
 
-def recursive_field_search(dict, queue, result=None):
-    if len(queue) > 0:
-        curr_tuple = queue.pop()
+def recursive_field_search(dict, stack, result=None):
+    if len(stack) > 0:
+        curr_tuple = stack.pop()
         regex = re.sub(r'\\\*', r'.*?', re.escape(curr_tuple[1]))
         field_to_search = curr_tuple[0]
         if field_to_search not in dict.keys():
@@ -189,7 +188,7 @@ def recursive_field_search(dict, queue, result=None):
             for string in lst_of_strings:
                 result = re.match(regex + r'$', string.strip(), re.IGNORECASE)
                 if result is not None:
-                    return recursive_field_search(dict, queue, result)
+                    return recursive_field_search(dict, stack, result)
     else:
         return result
 
@@ -198,8 +197,8 @@ def do_filter(data, field_value_list):
     items = []
     for line in data:
         if field_value_list is not None and len(field_value_list) > 0:
-            field_value_queue = deque(field_value_list)
-            match = recursive_field_search(line, field_value_queue)
+            field_value_stack = deque(field_value_list)
+            match = recursive_field_search(line, field_value_stack)
             if match is not None:
                 items.append(do_get_line_rep(line))
         else:
