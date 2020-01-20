@@ -274,41 +274,40 @@ def do_author_network(data):
     return coauthgraph
 
 
-def build_tree(root, line, venues_found):
-    if line["venue"] != "":
-        id_values = re.findall(r'\[.*?\](?=;|$)', line["venue"])[0]
-        if id_values not in venues_found:
-            venues_found.add(id_values)
-            node_name = re.findall(r'([^;\[]+)(?:\[.*?\])(?:;|$)', line["venue"])[0].strip()
-            venue_node = Node(node_name, root, id=id_values)
-            if line["volume"] != "":
+def build_tree(root, line, cur_id, venues_found):
+    if cur_id not in venues_found:
+        venues_found.add(cur_id)
+        node_name = re.findall(r'([^;\[]+)(?:\[.*?\])(?:;|$)', line["venue"])[0].strip()
+        venue_node = Node(node_name, root, id=cur_id)
+        if line["volume"] != "":
+            volume_node = Node(line["volume"], venue_node)
+            if line["issue"] != "":
+                Node(line["issue"], volume_node)
+    elif cur_id in venues_found:
+        venue_node = search.findall_by_attr(root, name="id", value=cur_id, maxlevel=2)[0]
+        if venue_node is not None and line["volume"] != "":
+            existing_volume = search.findall(venue_node, lambda node: node.name == line["volume"], maxlevel=3)
+            if not existing_volume:
                 volume_node = Node(line["volume"], venue_node)
                 if line["issue"] != "":
                     Node(line["issue"], volume_node)
-        elif id_values in venues_found:
-            venue_node = search.findall_by_attr(root, name="id", value=id_values, maxlevel=2)[0]
-            if venue_node is not None and line["volume"] != "":
-                existing_volume = search.findall(venue_node, lambda node: node.name == line["volume"], maxlevel=3)
-                if not existing_volume:
-                    volume_node = Node(line["volume"], venue_node)
-                    if line["issue"] != "":
-                        Node(line["issue"], volume_node)
-                elif existing_volume:
-                    existing_issue = search.findall(existing_volume[0], lambda node: node.name == line["issue"], maxlevel=4)
-                    if not existing_issue and line["issue"] != "":
-                        Node(line["issue"], existing_volume[0])
+            elif existing_volume and line["issue"] != "":
+                existing_issue = search.findall(existing_volume[0], lambda node: node.name == line["issue"], maxlevel=4)
+                if not existing_issue:
+                    Node(line["issue"], existing_volume[0])
 
 
 def do_retrieve_tree_of_venues(data, no_ids):
     root = Node("venues")
     venues_found = set()
     for line in data:
-        if no_ids is None or len(no_ids) == 0:
-            build_tree(root, line, venues_found)
-        else:
-            for id in no_ids:
-                if id not in line["venue"]:
-                    build_tree(root, line, venues_found)
+        if line["venue"] != "":
+            cur_id = re.findall(r'\[(.*?)\](?=;|$)', line["venue"])[0]
+            if no_ids is None or len(no_ids) == 0:
+                build_tree(root, line, cur_id, venues_found)
+            else:
+                if len(no_ids.intersection({id.strip() for id in cur_id.split(";")})) == 0:
+                    build_tree(root, line, cur_id, venues_found)
     return root
 
 
