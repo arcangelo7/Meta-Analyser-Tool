@@ -170,7 +170,7 @@ def do_get_line_rep(dict):
             authors_rep.append(name_rep)
         else:
             authors_rep.append(author.strip())
-    line_rep = ", ".join(authors_rep) + ' (' + dict['pub_date'] + '). ' + dict['title'] + '. ' + dict['venue']
+    line_rep = ", ".join(authors_rep) + '. (' + dict['pub_date'] + '). ' + dict['title'] + '. ' + dict['venue']
     line_rep = re.sub(r'\s\[.*?\](?=;|$)', r'', line_rep)
     return line_rep
 
