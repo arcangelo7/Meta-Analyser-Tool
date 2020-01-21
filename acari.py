@@ -28,40 +28,39 @@ from collections import deque
 from itertools import product, tee
 
 
-def find_all_ids(ids_set, ids_dictionary):
-    for name_and_id in ids_set:
+def find_all_ids(cur_entity_ids, all_entity_ids):
+    for id in cur_entity_ids:
         new_ids_set = set()
-        if "[" in name_and_id:
-            ids = re.findall(r'\[(.*?)\](?=;|$)', name_and_id)[0]
-            name = name_and_id.replace(ids, '').replace('[', '').replace(']', '').strip()
-            ids_list = ids.replace(' ', '').split(";")
-            key_to_change = None
-            for dict_keys, cur_id in product(ids_dictionary, ids_list):
-                if cur_id in dict_keys:
-                    dict_keys_set = dict_keys.replace(' ', '').split(";")
-                    new_ids_set.update(dict_keys_set)
-                    new_ids_set.update(ids_list)
-                    key_to_change = dict_keys
-                    break
-            if key_to_change:
-                ids_dictionary["; ".join(new_ids_set)] = ids_dictionary.pop(key_to_change)
-            else:
-                ids_dictionary[ids] = name
+        cur_ids_set = {id.strip() for id in id.split(";")}
+        key_to_change = set()
+        for found_id, cur_id in product(all_entity_ids, cur_ids_set):
+            found_id_list = found_id.split("; ")
+            if cur_id in found_id_list:
+                new_ids_set.update(found_id_list)
+                new_ids_set.update(cur_ids_set)
+                key_to_change.add(found_id)
+
+        if len(key_to_change) > 0:
+            for key in key_to_change:
+                all_entity_ids.remove(key)
+            all_entity_ids.add("; ".join(new_ids_set))
+        else:
+            all_entity_ids.add("; ".join(cur_ids_set))
 
 
-def add_all_ids(line, ids_dictionary, field, counter):
+def add_all_ids(line, all_entity_ids, field, counter):
     name_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])?(?:;|$)', line[field]))
     for name_and_id in name_and_ids:
         if "[" in name_and_id:
             ids = re.findall(r'\[(.*?)\](?=;|$)', name_and_id)[0]
-            ids_list = ids.replace(' ', '').split(";")
-            for list_of_keys, cur_id in product(ids_dictionary, ids_list):
-                if cur_id in list_of_keys:
+            cur_ids_set = {id.strip() for id in ids.split(";")}
+            for list_of_keys, cur_id in product(all_entity_ids, cur_ids_set):
+                if cur_id in list_of_keys.split("; "):
                     new_line = line[field].replace(ids, list_of_keys)
                     line[field] = new_line
                     break
         else:
-            new_line = line[field].replace(name_and_id, name_and_id + " [acarid: " + str(counter[0]) + "]")
+            new_line = line[field].replace(name_and_id, name_and_id + " [acarid:" + str(counter[0]) + "]")
             counter[0] += 1
             line[field] = new_line
 
@@ -71,24 +70,24 @@ def process_metadata(file_path):
         reader = csv.DictReader(csvfile)
         it1, it2, it3 = tee(reader, 3)
 
-        all_the_author_keys = dict()
-        all_the_venue_keys = dict()
-        all_the_publisher_keys = dict()
+        all_the_author_ids = set()
+        all_the_venue_ids = set()
+        all_the_publisher_ids = set()
 
         for line in it1:
-            authors_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["author"]))
-            venue_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["venue"]))
-            publisher_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["publisher"]))
+            authors_ids = set(id.strip() for id in re.findall(r'\[(.*?)\](?:;|$)', line["author"]))
+            venue_ids = set(id.strip() for id in re.findall(r'\[(.*?)\](?:;|$)', line["venue"]))
+            publisher_ids = set(id.strip() for id in re.findall(r'\[(.*?)\](?:;|$)', line["publisher"]))
 
-            find_all_ids(authors_and_ids, all_the_author_keys)
-            find_all_ids(venue_and_ids, all_the_venue_keys)
-            find_all_ids(publisher_and_ids, all_the_publisher_keys)
+            find_all_ids(authors_ids, all_the_author_ids)
+            find_all_ids(venue_ids, all_the_venue_ids)
+            find_all_ids(publisher_ids, all_the_publisher_ids)
 
         counter = [0] # Must be mutable to change, otherwise it is copied everytime and restarts from zero
         for line in it2:
-            add_all_ids(line, all_the_author_keys, "author", counter)
-            add_all_ids(line, all_the_venue_keys, "venue", counter)
-            add_all_ids(line, all_the_publisher_keys, "publisher", counter)
+            add_all_ids(line, all_the_author_ids, "author", counter)
+            add_all_ids(line, all_the_venue_ids, "venue", counter)
+            add_all_ids(line, all_the_publisher_ids, "publisher", counter)
 
         # toCSV = list(it3)
         # keys = toCSV[0].keys()
