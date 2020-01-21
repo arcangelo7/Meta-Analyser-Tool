@@ -28,8 +28,9 @@ from collections import deque
 from itertools import product, tee
 
 
-def find_all_ids(ids_set, new_ids_set, ids_dictionary):
+def find_all_ids(ids_set, ids_dictionary):
     for name_and_id in ids_set:
+        new_ids_set = set()
         if "[" in name_and_id:
             ids = re.findall(r'\[(.*?)\](?=;|$)', name_and_id)[0]
             name = name_and_id.replace(ids, '').replace('[', '').replace(']', '').strip()
@@ -79,13 +80,9 @@ def process_metadata(file_path):
             venue_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["venue"]))
             publisher_and_ids = set((name[0] + name[1]).strip() for name in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', line["publisher"]))
 
-            new_author_ids_set = set()
-            new_venue_ids_set = set()
-            new_publisher_ids_set = set()
-
-            find_all_ids(authors_and_ids, new_author_ids_set, all_the_author_keys)
-            find_all_ids(venue_and_ids, new_venue_ids_set, all_the_venue_keys)
-            find_all_ids(publisher_and_ids, new_publisher_ids_set, all_the_publisher_keys)
+            find_all_ids(authors_and_ids, all_the_author_keys)
+            find_all_ids(venue_and_ids, all_the_venue_keys)
+            find_all_ids(publisher_and_ids, all_the_publisher_keys)
 
         counter = [0] # Must be mutable to change, otherwise it is copied everytime and restarts from zero
         for line in it2:
