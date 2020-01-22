@@ -256,11 +256,28 @@ def do_coauthor_graph(data, string_to_search, level):
     return coauthor_graph
 
 
+def merge_authors_network(cur_author, coauthgraph, coauthgraph_dictionary):
+    cur_author_id = re.findall(r'\[(.*?)\](?=;|$)', cur_author)[0]
+    if len(coauthgraph) > 0:
+        if cur_author_id in coauthgraph_dictionary:
+            new_author = coauthgraph_dictionary[cur_author_id]
+        else:
+            coauthgraph_dictionary[cur_author_id] = cur_author
+            new_author = cur_author
+    else:
+        coauthgraph_dictionary[cur_author_id] = cur_author
+        new_author = cur_author
+    return new_author
+
+
 def do_author_network(data):
     coauthgraph = nx.Graph()
+    coauthgraph_dictionary = dict()
     for row in data:
         auths = {"".join(aut).strip() for aut in re.findall(r'([^;\[]+)(\[.*?\])(?:;|$)', row['author'])}
         for aut1, aut2 in product(auths, auths):
+            aut1 = merge_authors_network(aut1, coauthgraph, coauthgraph_dictionary)
+            aut2 = merge_authors_network(aut2, coauthgraph, coauthgraph_dictionary)
             if not coauthgraph.has_node(aut1):
                 coauthgraph.add_node(aut1)
             if not coauthgraph.has_node(aut2):
