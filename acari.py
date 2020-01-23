@@ -138,9 +138,9 @@ def do_get_by_id(data, id, field_set):
     list_of_papers = []
     set_of_reps = set()
     regex = re.sub(r'\\\*', r'.*?', re.escape(id))
+    if field_set is None or len(field_set) == 0:
+        field_set = {'author', 'venue', 'publisher', 'id'}
     for row in data:
-        if field_set is None or len(field_set) == 0:
-            field_set = set('author', 'venue', 'publisher', 'id')
         for field in field_set:
             if field in row.keys():
                 matchobj = re.search(regex, row[field], re.IGNORECASE)
