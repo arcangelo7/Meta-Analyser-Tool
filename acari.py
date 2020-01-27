@@ -83,18 +83,11 @@ def process_metadata(file_path):
             find_all_ids(venue_ids, all_the_venue_ids)
             find_all_ids(publisher_ids, all_the_publisher_ids)
 
-        counter = [0] # Must be mutable to change, otherwise it is copied everytime and restarts from zero
+        counter = [0]
         for line in it2:
             add_all_ids(line, all_the_author_ids, "author", counter)
             add_all_ids(line, all_the_venue_ids, "venue", counter)
             add_all_ids(line, all_the_publisher_ids, "publisher", counter)
-
-        # toCSV = list(it3)
-        # keys = toCSV[0].keys()
-        # with open('ouput.csv', 'w', encoding='utf-8') as output_file:
-        #     dict_writer = csv.DictWriter(output_file, keys)
-        #     dict_writer.writeheader()
-        #     dict_writer.writerows(toCSV)
 
         return list(it3)
 
@@ -122,6 +115,7 @@ def do_get_id_set (my_regex, my_dict, retrieve_keys):
                 if matchobj:
                     output_set.update([itemid.strip() for itemid in my_dict['id'].split(';')])
     return output_set
+
 
 def do_get_ids(data, str_value, field_set):
     items = set()
