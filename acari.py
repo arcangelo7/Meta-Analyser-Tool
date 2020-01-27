@@ -145,9 +145,9 @@ def do_get_by_id(data, id, field_set):
     return set_of_reps
 
 
-def do_get_line_rep(dict):
+def do_get_line_rep(dictionary):
     authors_rep = []
-    authors_collection = re.findall(r'([^;\[]+)\[.*?\](?:;|$)', dict['author'])
+    authors_collection = re.findall(r'([^;\[]+)\[.*?\](?:;|$)', dictionary['author'])
     for author in authors_collection:
         if ',' in author:
             family_n_given_n = author.split(',')
@@ -157,25 +157,25 @@ def do_get_line_rep(dict):
             authors_rep.append(name_rep)
         else:
             authors_rep.append(author.strip())
-    line_rep = ", ".join(authors_rep) + '. (' + dict['pub_date'] + '). ' + dict['title'] + '. ' + dict['venue']
+    line_rep = ", ".join(authors_rep) + '. (' + dictionary['pub_date'] + '). ' + dictionary['title'] + '. ' + dictionary['venue']
     line_rep = re.sub(r'\s\[.*?\](?=;|$)', r'', line_rep)
     return line_rep
 
 
-def recursive_field_search(dict, stack, result=None):
+def recursive_field_search(dictionary, stack, result=None):
     if len(stack) > 0:
         curr_tuple = stack.pop()
         regex = re.sub(r'\\\*', r'.*?', re.escape(curr_tuple[1]))
         field_to_search = curr_tuple[0]
-        if field_to_search not in dict.keys():
+        if field_to_search not in dictionary.keys():
             return None
         else:
-            no_id_str = re.sub(r'\s\[.*?\](?=;|$)', r'', dict[field_to_search])
+            no_id_str = re.sub(r'\s\[.*?\](?=;|$)', r'', dictionary[field_to_search])
             lst_of_strings = no_id_str.split(';')
             for string in lst_of_strings:
                 result = re.match(regex + r'$', string.strip(), re.IGNORECASE)
                 if result is not None:
-                    return recursive_field_search(dict, stack, result)
+                    return recursive_field_search(dictionary, stack, result)
     else:
         return result
 
